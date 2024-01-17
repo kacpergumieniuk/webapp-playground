@@ -1,33 +1,47 @@
-import { component$ } from "@builder.io/qwik";
-import { arbitrum, mainnet } from '@wagmi/core/chains';
-import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi';
+import { component$, useStore, useVisibleTask$, $ } from "@builder.io/qwik";
+import modal from "~/modal";
 
-const projectId ='1b270fd1dd80393c215c551fc57c8f95'
-const chains = [mainnet, arbitrum]
-const wagmiConfig = defaultWagmiConfig({
-  chains,
-  projectId,
-  metadata: {
-    name: 'Qwik Example',
-    description: 'Qwik Example',
-    url: 'https://web3modal.com',
-    icons: ['https://avatars.githubusercontent.com/u/37784886']
-  }
-})
-
-
-const modal = createWeb3Modal({ wagmiConfig, projectId, chains, themeMode: 'light' })
-
+interface UserStore {
+  networkId: undefined | number;
+  address: undefined | string;
+}
 
 export default component$(() => {
+  const userStore = useStore<UserStore>({
+    networkId: undefined,
+    address: undefined,
+  });
 
-  const {selectedNetworkId} = modal.getState()
+  const isConnected = userStore.networkId; //for readability
 
-  
+  useVisibleTask$(async () => {
+    modal.subscribeState((state) => {
+      if (state.selectedNetworkId) {
+        userStore.networkId = modal.getChainId();
+        userStore.address = modal.getAddress();
+      }
+    });
+  });
+
+  const openModal = $(() => {
+    if (isConnected) {
+      modal.disconnect();
+      userStore.networkId = undefined;
+    } else {
+      modal.open({ view: "Networks" });
+    }
+  });
+
   return (
-    <div class="h-screen w-screen bg-black text-white text-xl flex flex-col gap-2 justify-center items-center" onClick$={() => console.log(modal.getState())}>
-      <button onClick$={() => modal.open({ view: 'Networks' })}>Connect</button>
-      <p>{selectedNetworkId}</p>
+    <div class="h-screen w-screen bg-black text-white text-xl flex flex-col gap-2 justify-center items-center">
+      <button
+        onClick$={openModal}
+        class="bg-purple-700 px-4 py-2 rounded text-semibold"
+      >
+        {isConnected ? "Disconnect" : "Connect"}
+      </button>
+      <p>{isConnected && userStore.networkId}</p>
+      <p>{isConnected && userStore.address}</p>
     </div>
   );
 });
